@@ -26,7 +26,8 @@ VIP_CONTEXT = {
     "transport_state": "PENDING",
     "lounge_state": "PENDING",
     "overall_state": "ACTIVE",
-    "gate_state": "WAITING"
+    "gate_state": "WAITING",
+    "connection_risk_score": 0
 }
 
 # Dummy boarding time variable
@@ -64,6 +65,7 @@ def reconcile(context: dict, event: str):
         context["lounge_state"] = "PENDING"
         context["overall_state"] = "ACTIVE"
         context["gate_state"] = "WAITING"
+        context["connection_risk_score"] = 0
 
     elif event == "VIP_ENTERED_TERMINAL":
         context["current_location"] = "CHECKIN"
@@ -78,6 +80,15 @@ def reconcile(context: dict, event: str):
     elif event == "FLIGHT_DELAYED":
         boarding_time += 30  # Extend boarding time
         print("Lounge extended")
+        
+        # Predictive Risk Engine: increase connection risk by 35%
+        context["connection_risk_score"] = min(100, context["connection_risk_score"] + 35)
+        
+        # Auto-escalate to CRITICAL_RISK if risk exceeds 70%
+        if context["connection_risk_score"] > 70:
+            context["overall_state"] = "CRITICAL_RISK"
+            context["transport_state"] = "ESCORT_BUGGY_REQUIRED"
+            print(f"CRITICAL RISK: Connection risk at {context['connection_risk_score']}% - Escort buggy dispatched")
 
     elif event == "FLIGHT_CANCELLED":
         if context["current_location"] == "LOUNGE":
@@ -87,9 +98,13 @@ def reconcile(context: dict, event: str):
 
     elif event == "BOARDING_STARTED":
         context["lounge_state"] = "COMPLETED"
-        context["current_location"] = "GATE"
+        context["current_location"] = "MOVING_TO_GATE"
         context["gate_state"] = "BOARDING"
         context["overall_state"] = "ACTIVE"  # Clear any previous rebooking/escalated states
+
+    elif event == "VIP_ARRIVED_AT_GATE":
+        context["current_location"] = "GATE"
+        context["gate_state"] = "WAITING_TO_BOARD"
 
     elif event == "FLIGHT_LANDED":
         # Only increment if not at the last leg
@@ -106,11 +121,14 @@ def reconcile(context: dict, event: str):
         context["lounge_state"] = "DENIED_TIME_PRIORITY"
         context["current_location"] = "DIRECT_TO_GATE"
 
+    elif event == "BAGGAGE_TRANSFERRED":
+        context["baggage_state"] = "TRANSFERRED_TO_NEXT_LEG"
+
     elif event == "BAGGAGE_CLAIMED":
         context["baggage_state"] = "CLAIMED"
 
     elif event == "VIP_EXITED_TERMINAL":
-        if context["baggage_state"] == "CLAIMED":
+        if context["journey_type"] == "ARRIVAL" and context["baggage_state"] == "CLAIMED":
             context["transport_state"] = "DRIVER_ASSIGNED"
 
     elif event == "VIP_NO_SHOW":

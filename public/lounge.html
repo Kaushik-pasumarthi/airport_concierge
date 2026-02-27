@@ -58,6 +58,22 @@
             }
         }
 
+        @keyframes flashUpdate {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .flash-update {
+            animation: flashUpdate 0.3s ease-in-out;
+        }
+
         .container {
             text-align: center;
             max-width: 900px;
@@ -124,6 +140,33 @@
             background-color: #c0392b;
             color: white;
         }
+
+        .sync-ledger {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: rgba(0, 0, 0, 0.9);
+            border-top: 1px solid #333;
+            padding: 10px 20px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            color: #00ff88;
+            max-height: 80px;
+            overflow: hidden;
+        }
+
+        .sync-ledger-title {
+            color: #666;
+            margin-bottom: 5px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .sync-ledger-content {
+            line-height: 1.4;
+        }
     </style>
 </head>
 <body class="state-pending">
@@ -150,12 +193,27 @@
         </div>
     </div>
 
+    <div class="sync-ledger">
+        <div class="sync-ledger-title">Live Sync Ledger</div>
+        <div class="sync-ledger-content" id="sync-ledger"></div>
+    </div>
+
     <script>
         const SERVER_IP = window.location.hostname || '127.0.0.1';
         const WS_URL = `ws://${SERVER_IP}:8000/ws`;
 
         let ws;
         let reconnectInterval;
+        let lastLoungeState = null;
+        let lastLocation = null;
+
+        function triggerFlashUpdate() {
+            const statusMessage = document.getElementById('status-message');
+            statusMessage.classList.add('flash-update');
+            setTimeout(() => {
+                statusMessage.classList.remove('flash-update');
+            }, 300);
+        }
 
         function updateUI(context) {
             // Update info displays
@@ -202,7 +260,16 @@
             ws.onmessage = (event) => {
                 try {
                     const context = JSON.parse(event.data);
+                    
+                    // Check if state changed
+                    if (context.lounge_state !== lastLoungeState || context.current_location !== lastLocation) {
+                        triggerFlashUpdate();
+                        lastLoungeState = context.lounge_state;
+                        lastLocation = context.current_location;
+                    }
+                    
                     updateUI(context);
+                    updateSyncLedger(context);
                 } catch (e) {
                     console.error('Failed to parse message:', e);
                 }
@@ -226,6 +293,20 @@
 
         // Initial connection
         connect();
+
+        function updateSyncLedger(context) {
+            const ledger = document.getElementById('sync-ledger');
+            const now = new Date();
+            const timestamp = now.toTimeString().split(' ')[0];
+            const newEntry = `[${timestamp}] System Sync: VIP location updated to ${context.current_location} | State: ${context.overall_state}`;
+            
+            const lines = ledger.innerHTML.split('<br>').filter(line => line.trim());
+            lines.push(newEntry);
+            while (lines.length > 3) {
+                lines.shift();
+            }
+            ledger.innerHTML = lines.join('<br>');
+        }
     </script>
 </body>
 </html>

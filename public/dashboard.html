@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VIP Journey Dashboard</title>
+    <title>VIP-ORC :: Terminal Control System</title>
     <style>
         * {
             margin: 0;
@@ -12,174 +12,509 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #1a1a2e;
-            color: #eaeaea;
+            font-family: 'Consolas', 'Monaco', 'Lucida Console', monospace;
+            background-color: #000000;
+            color: #CCCC99;
             min-height: 100vh;
-            padding: 20px;
+            display: flex;
         }
 
-        h1 {
-            text-align: center;
-            color: #00d4ff;
-            margin-bottom: 10px;
-            font-size: 2rem;
+        /* Command Injector Sidebar */
+        .sidebar {
+            width: 280px;
+            background-color: #0a0a0a;
+            border-right: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
         }
 
-        .status {
-            text-align: center;
-            margin-bottom: 20px;
-            font-size: 0.9rem;
+        .sidebar-header {
+            padding: 12px 15px;
+            border-bottom: 1px solid #333;
+            background-color: #111;
         }
 
-        .status.connected {
-            color: #00ff88;
+        .sidebar-header h2 {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: normal;
         }
 
-        .status.disconnected {
-            color: #ff4444;
+        .cmd-section {
+            padding: 8px 0;
+            border-bottom: 1px solid #222;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
+        .cmd-section-title {
+            font-size: 9px;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 4px 15px;
+            margin-bottom: 4px;
         }
 
-        .json-container {
-            background-color: #16213e;
-            border: 1px solid #0f3460;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 30px;
-            overflow-x: auto;
+        .cmd-btn {
+            display: block;
+            width: 100%;
+            padding: 8px 15px;
+            background: transparent;
+            border: none;
+            color: #CCCC99;
+            font-family: inherit;
+            font-size: 12px;
+            text-align: left;
+            cursor: pointer;
+            transition: background-color 0.1s;
         }
 
-        .json-container h2 {
-            color: #00d4ff;
-            margin-bottom: 15px;
-            font-size: 1.2rem;
+        .cmd-btn:hover {
+            background-color: #1a1a1a;
         }
 
-        pre {
-            background-color: #0f0f23;
-            padding: 20px;
-            border-radius: 8px;
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 14px;
+        .cmd-btn:active {
+            background-color: #252525;
+        }
+
+        .cmd-btn::before {
+            content: '>';
+            color: #555;
+            margin-right: 8px;
+        }
+
+        .cmd-btn:hover::before {
+            color: #CCCC99;
+        }
+
+        .cmd-btn.cmd-reset {
+            color: #CC9966;
+            border-top: 1px solid #333;
+            margin-top: auto;
+        }
+
+        .cmd-btn.cmd-danger {
+            color: #996666;
+        }
+
+        .cmd-btn.cmd-success {
+            color: #99CC99;
+        }
+
+        /* Main Content Area */
+        .main {
+            margin-left: 280px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Top Header Bar */
+        .header-bar {
+            background-color: #0a0a0a;
+            border-bottom: 1px solid #333;
+            padding: 8px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .system-title {
+            font-size: 11px;
+            color: #666;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        .system-title span {
+            color: #CCCC99;
+        }
+
+        .status-indicator {
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #663333;
+        }
+
+        .status-dot.connected {
+            background-color: #669966;
+            box-shadow: 0 0 6px #669966;
+        }
+
+        .status-text {
+            color: #666;
+        }
+
+        .status-text.connected {
+            color: #99CC99;
+        }
+
+        /* Content Split */
+        .content-area {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Context State Panel */
+        .state-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #333;
+        }
+
+        .panel-header {
+            padding: 10px 20px;
+            border-bottom: 1px solid #222;
+            background-color: #080808;
+        }
+
+        .panel-header h3 {
+            font-size: 10px;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: normal;
+        }
+
+        .state-display {
+            flex: 1;
+            padding: 15px 20px;
+            overflow: auto;
+            background-color: #050505;
+        }
+
+        .state-display pre {
+            font-family: inherit;
+            font-size: 12px;
             line-height: 1.6;
-            color: #00ff88;
-            overflow-x: auto;
+            color: #CCCC99;
             white-space: pre-wrap;
             word-wrap: break-word;
         }
 
-        .button-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        .state-display .key {
+            color: #888;
+        }
+
+        .state-display .string {
+            color: #99CC99;
+        }
+
+        .state-display .null {
+            color: #666;
+        }
+
+        .state-display .boolean-true {
+            color: #99CC99;
+        }
+
+        .state-display .boolean-false {
+            color: #996666;
+        }
+
+        /* Activity Log Panel */
+        .log-panel {
+            width: 420px;
+            display: flex;
+            flex-direction: column;
+            background-color: #050505;
+        }
+
+        .log-content {
+            flex: 1;
+            padding: 10px 15px;
+            overflow-y: auto;
+            font-size: 11px;
+            line-height: 1.8;
+        }
+
+        .log-entry {
+            color: #888;
+            border-bottom: 1px solid #111;
+            padding: 4px 0;
+        }
+
+        .log-entry .timestamp {
+            color: #555;
+        }
+
+        .log-entry .event-name {
+            color: #CCCC99;
+        }
+
+        .log-entry .location {
+            color: #99CC99;
+        }
+
+        .log-entry .state {
+            color: #CC9966;
+        }
+
+        .log-entry.event-inject {
+            color: #CCCC99;
+        }
+
+        .log-entry.event-inject .arrow {
+            color: #669966;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #444;
+        }
+
+        /* Footer status bar */
+        .footer-bar {
+            background-color: #0a0a0a;
+            border-top: 1px solid #333;
+            padding: 6px 20px;
+            font-size: 10px;
+            color: #444;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .footer-bar span {
+            color: #555;
+        }
+
+        /* Risk Gauge Panel */
+        .risk-panel {
+            background-color: #0a0a0a;
+            border-bottom: 1px solid #333;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .risk-label {
+            font-size: 10px;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            min-width: 180px;
+        }
+
+        .risk-gauge-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
             gap: 15px;
         }
 
-        .event-btn {
-            padding: 20px 25px;
-            font-size: 1rem;
-            font-weight: 600;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s ease;
+        .risk-gauge {
+            flex: 1;
+            height: 8px;
+            background-color: #1a1a1a;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .risk-gauge-fill {
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s ease, background-color 0.5s ease;
+            border-radius: 4px;
+        }
+
+        .risk-gauge-fill.low {
+            background-color: #336633;
+        }
+
+        .risk-gauge-fill.medium {
+            background-color: #666633;
+        }
+
+        .risk-gauge-fill.high {
+            background-color: #996633;
+        }
+
+        .risk-gauge-fill.critical {
+            background-color: #993333;
+            box-shadow: 0 0 10px #993333;
+            animation: pulse-critical 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse-critical {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .risk-value {
+            font-size: 14px;
+            font-weight: bold;
+            min-width: 50px;
+            text-align: right;
+        }
+
+        .risk-value.low { color: #669966; }
+        .risk-value.medium { color: #CCCC66; }
+        .risk-value.high { color: #CC9966; }
+        .risk-value.critical { color: #CC6666; }
+
+        .risk-status {
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 3px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
+            min-width: 100px;
+            text-align: center;
         }
 
-        .event-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+        .risk-status.low {
+            color: #669966;
+            border: 1px solid #336633;
         }
 
-        .event-btn:active {
-            transform: translateY(0);
+        .risk-status.medium {
+            color: #CCCC66;
+            border: 1px solid #666633;
         }
 
-        .btn-enter {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+        .risk-status.high {
+            color: #CC9966;
+            border: 1px solid #996633;
         }
 
-        .btn-delayed {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
+        .risk-status.critical {
+            color: #CC6666;
+            border: 1px solid #993333;
+            background-color: rgba(153, 51, 51, 0.2);
+            animation: blink-critical 1s ease-in-out infinite;
         }
 
-        .btn-cancelled {
-            background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
-            color: white;
-        }
-
-        .btn-boarding {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-            color: white;
-        }
-
-        .btn-landed {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            color: white;
-        }
-
-        .btn-late {
-            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-            color: #333;
-        }
-
-        .btn-exited {
-            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
-            color: #333;
-        }
-
-        .btn-noshow {
-            background: linear-gradient(135deg, #434343 0%, #000000 100%);
-            color: white;
-            border: 1px solid #666;
-        }
-
-        .btn-reset {
-            background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%);
-            color: #333;
-            grid-column: span 2;
-            font-size: 1.2rem;
-            border: 3px solid #ff6b00;
-            box-shadow: 0 0 20px rgba(255, 210, 0, 0.5);
-        }
-
-        .section-title {
-            color: #00d4ff;
-            margin-bottom: 20px;
-            font-size: 1.2rem;
+        @keyframes blink-critical {
+            0%, 100% { background-color: rgba(153, 51, 51, 0.2); }
+            50% { background-color: rgba(153, 51, 51, 0.4); }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>VIP Journey Orchestrator</h1>
-        <div class="status disconnected" id="status">Disconnected</div>
-
-        <div class="json-container">
-            <h2>VIP Context State</h2>
-            <pre id="json-display">Waiting for connection...</pre>
+    <!-- Command Injector Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h2>Command Injector</h2>
+        </div>
+        
+        <div class="cmd-section">
+            <div class="cmd-section-title">VIP Entry</div>
+            <button class="cmd-btn" onclick="injectEvent('VIP_ENTERED_TERMINAL')">VIP_ENTERED_TERMINAL</button>
+            <button class="cmd-btn" onclick="injectEvent('FACE_VERIFIED')">FACE_VERIFIED</button>
         </div>
 
-        <h2 class="section-title">Event Controls</h2>
-        <div class="button-grid">
-            <button class="event-btn btn-reset" onclick="sendEvent('RESET')">🔄 RESET DEMO</button>
-            <button class="event-btn btn-enter" onclick="sendEvent('VIP_ENTERED_TERMINAL')">VIP Enters Terminal</button>
-            <button class="event-btn btn-delayed" onclick="sendEvent('FLIGHT_DELAYED')">Flight Delayed</button>
-            <button class="event-btn btn-cancelled" onclick="sendEvent('FLIGHT_CANCELLED')">Flight Cancelled</button>
-            <button class="event-btn btn-boarding" onclick="sendEvent('BOARDING_STARTED')">Boarding Started</button>
-            <button class="event-btn btn-landed" onclick="sendEvent('FLIGHT_LANDED')">Flight Landed</button>
-            <button class="event-btn btn-late" onclick="sendEvent('VIP_LATE_TO_LOUNGE')">VIP Late to Lounge</button>
-            <button class="event-btn btn-exited" onclick="sendEvent('VIP_EXITED_TERMINAL')">VIP Exited Terminal</button>
-            <button class="event-btn btn-noshow" onclick="sendEvent('VIP_NO_SHOW')">VIP No Show</button>
+        <div class="cmd-section">
+            <div class="cmd-section-title">Flight Status</div>
+            <button class="cmd-btn" onclick="injectEvent('FLIGHT_DELAYED')">FLIGHT_DELAYED</button>
+            <button class="cmd-btn cmd-danger" onclick="injectEvent('FLIGHT_CANCELLED')">FLIGHT_CANCELLED</button>
+            <button class="cmd-btn cmd-success" onclick="injectEvent('BOARDING_STARTED')">BOARDING_STARTED</button>
+            <button class="cmd-btn" onclick="injectEvent('VIP_ARRIVED_AT_GATE')">VIP_ARRIVED_AT_GATE</button>
+            <button class="cmd-btn" onclick="injectEvent('FLIGHT_LANDED')">FLIGHT_LANDED</button>
         </div>
-    </div>
+
+        <div class="cmd-section">
+            <div class="cmd-section-title">Baggage</div>
+            <button class="cmd-btn" onclick="injectEvent('BAGGAGE_TRANSFERRED')">BAGGAGE_TRANSFERRED</button>
+            <button class="cmd-btn cmd-success" onclick="injectEvent('BAGGAGE_CLAIMED')">BAGGAGE_CLAIMED</button>
+        </div>
+
+        <div class="cmd-section">
+            <div class="cmd-section-title">Exceptions</div>
+            <button class="cmd-btn" onclick="injectEvent('VIP_LATE_TO_LOUNGE')">VIP_LATE_TO_LOUNGE</button>
+            <button class="cmd-btn cmd-danger" onclick="injectEvent('VIP_NO_SHOW')">VIP_NO_SHOW</button>
+        </div>
+
+        <div class="cmd-section" style="flex: 1;"></div>
+
+        <div class="cmd-section">
+            <div class="cmd-section-title">Control</div>
+            <button class="cmd-btn" onclick="injectEvent('VIP_EXITED_TERMINAL')">VIP_EXITED_TERMINAL</button>
+            <button class="cmd-btn cmd-reset" onclick="injectEvent('RESET')">RESET_SYSTEM</button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main">
+        <header class="header-bar">
+            <div class="system-title">VIP-ORC <span>::</span> Terminal Control System v1.0</div>
+            <div class="status-indicator">
+                <div class="status-dot" id="status-dot"></div>
+                <span class="status-text" id="status-text">DISCONNECTED</span>
+            </div>
+        </header>
+
+        <!-- Risk Gauge Panel -->
+        <div class="risk-panel">
+            <div class="risk-label">Connection Risk Score</div>
+            <div class="risk-gauge-container">
+                <div class="risk-gauge">
+                    <div class="risk-gauge-fill low" id="risk-fill"></div>
+                </div>
+                <div class="risk-value low" id="risk-value">0%</div>
+                <div class="risk-status low" id="risk-status">NOMINAL</div>
+            </div>
+        </div>
+
+        <div class="content-area">
+            <!-- State Display Panel -->
+            <section class="state-panel">
+                <div class="panel-header">
+                    <h3>VIP Context State</h3>
+                </div>
+                <div class="state-display">
+                    <pre id="json-display">Awaiting connection...</pre>
+                </div>
+            </section>
+
+            <!-- Activity Log Panel -->
+            <section class="log-panel">
+                <div class="panel-header">
+                    <h3>System Activity Log</h3>
+                </div>
+                <div class="log-content" id="activity-log">
+                    <div class="log-entry">
+                        <span class="timestamp">[--:--:--]</span> System initialized. Awaiting WebSocket connection...
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <footer class="footer-bar">
+            <span>SESSION: <span id="session-id">--</span></span>
+            <span>UPTIME: <span id="uptime">00:00:00</span></span>
+            <span>EVENTS: <span id="event-count">0</span></span>
+        </footer>
+    </main>
 
     <script>
         const SERVER_IP = window.location.hostname || '127.0.0.1';
@@ -188,21 +523,82 @@
 
         let ws;
         let reconnectInterval;
+        let eventCount = 0;
+        let startTime = Date.now();
+        let lastContext = null;
+
+        // Generate session ID
+        const sessionId = Math.random().toString(36).substring(2, 10).toUpperCase();
+        document.getElementById('session-id').textContent = sessionId;
+
+        // Uptime counter
+        setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const hours = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+            const minutes = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+            const seconds = String(elapsed % 60).padStart(2, '0');
+            document.getElementById('uptime').textContent = `${hours}:${minutes}:${seconds}`;
+        }, 1000);
+
+        function getTimestamp() {
+            const now = new Date();
+            return now.toTimeString().split(' ')[0];
+        }
+
+        function addLogEntry(message, type = 'info') {
+            const log = document.getElementById('activity-log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.innerHTML = `<span class="timestamp">[${getTimestamp()}]</span> ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function formatJSON(obj) {
+            const json = JSON.stringify(obj, null, 2);
+            return json
+                .replace(/"([^"]+)":/g, '<span class="key">"$1"</span>:')
+                .replace(/: "([^"]+)"/g, ': <span class="string">"$1"</span>')
+                .replace(/: null/g, ': <span class="null">null</span>')
+                .replace(/: true/g, ': <span class="boolean-true">true</span>')
+                .replace(/: false/g, ': <span class="boolean-false">false</span>');
+        }
 
         function connect() {
             ws = new WebSocket(WS_URL);
 
             ws.onopen = () => {
                 console.log('WebSocket connected');
-                document.getElementById('status').textContent = 'Connected';
-                document.getElementById('status').className = 'status connected';
+                document.getElementById('status-dot').classList.add('connected');
+                document.getElementById('status-text').textContent = 'CONNECTED';
+                document.getElementById('status-text').classList.add('connected');
                 clearInterval(reconnectInterval);
+                addLogEntry('WebSocket connection established', 'info');
             };
 
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    document.getElementById('json-display').textContent = JSON.stringify(data, null, 2);
+                    document.getElementById('json-display').innerHTML = formatJSON(data);
+                    
+                    // Update Risk Gauge
+                    updateRiskGauge(data.connection_risk_score || 0);
+                    
+                    // Log state changes
+                    if (lastContext) {
+                        if (data.current_location !== lastContext.current_location) {
+                            addLogEntry(`Location: <span class="location">${lastContext.current_location}</span> → <span class="location">${data.current_location}</span>`);
+                        }
+                        if (data.overall_state !== lastContext.overall_state) {
+                            addLogEntry(`State: <span class="state">${data.overall_state}</span>`);
+                        }
+                        if (data.connection_risk_score !== lastContext.connection_risk_score) {
+                            addLogEntry(`Risk Score: <span class="state">${data.connection_risk_score}%</span>`);
+                        }
+                    } else {
+                        addLogEntry(`Initial state received: <span class="state">${data.overall_state}</span>`);
+                    }
+                    lastContext = data;
                 } catch (e) {
                     document.getElementById('json-display').textContent = event.data;
                 }
@@ -210,20 +606,24 @@
 
             ws.onclose = () => {
                 console.log('WebSocket disconnected');
-                document.getElementById('status').textContent = 'Disconnected - Reconnecting...';
-                document.getElementById('status').className = 'status disconnected';
+                document.getElementById('status-dot').classList.remove('connected');
+                document.getElementById('status-text').textContent = 'RECONNECTING...';
+                document.getElementById('status-text').classList.remove('connected');
+                addLogEntry('Connection lost. Attempting reconnect...', 'info');
                 reconnectInterval = setInterval(() => {
-                    console.log('Attempting to reconnect...');
                     connect();
                 }, 3000);
             };
 
             ws.onerror = (error) => {
                 console.error('WebSocket error:', error);
+                addLogEntry('WebSocket error occurred', 'info');
             };
         }
 
-        async function sendEvent(eventName) {
+        async function injectEvent(eventName) {
+            addLogEntry(`<span class="arrow">→</span> Injecting: <span class="event-name">${eventName}</span>`, 'event-inject');
+            
             try {
                 const response = await fetch(API_URL, {
                     method: 'POST',
@@ -234,18 +634,57 @@
                 });
 
                 if (response.ok) {
-                    console.log(`Event ${eventName} sent successfully`);
+                    eventCount++;
+                    document.getElementById('event-count').textContent = eventCount;
+                    addLogEntry(`<span class="arrow">←</span> ACK: ${eventName} processed`, 'event-inject');
                 } else {
-                    console.error(`Failed to send event: ${response.status}`);
+                    addLogEntry(`ERR: Failed to process ${eventName} (${response.status})`, 'info');
                 }
             } catch (error) {
                 console.error('Error sending event:', error);
-                alert(`Failed to send event: ${error.message}`);
+                addLogEntry(`ERR: ${error.message}`, 'info');
             }
         }
 
         // Initial connection
         connect();
+
+        function updateRiskGauge(score) {
+            const fill = document.getElementById('risk-fill');
+            const value = document.getElementById('risk-value');
+            const status = document.getElementById('risk-status');
+            
+            fill.style.width = score + '%';
+            value.textContent = score + '%';
+            
+            // Remove all classes
+            fill.className = 'risk-gauge-fill';
+            value.className = 'risk-value';
+            status.className = 'risk-status';
+            
+            // Apply appropriate class based on score
+            if (score <= 25) {
+                fill.classList.add('low');
+                value.classList.add('low');
+                status.classList.add('low');
+                status.textContent = 'NOMINAL';
+            } else if (score <= 50) {
+                fill.classList.add('medium');
+                value.classList.add('medium');
+                status.classList.add('medium');
+                status.textContent = 'ELEVATED';
+            } else if (score <= 70) {
+                fill.classList.add('high');
+                value.classList.add('high');
+                status.classList.add('high');
+                status.textContent = 'HIGH';
+            } else {
+                fill.classList.add('critical');
+                value.classList.add('critical');
+                status.classList.add('critical');
+                status.textContent = 'CRITICAL';
+            }
+        }
     </script>
 </body>
 </html>

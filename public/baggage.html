@@ -76,17 +76,37 @@
             border-radius: 10px;
             font-size: 1.4rem;
             font-weight: 700;
-            background-color: #0f3460;
+            background-color: #16213e;
             transition: all 0.3s ease;
+            border: 3px solid transparent;
         }
 
         .leg.current {
             background: linear-gradient(135deg, #00d4ff 0%, #0099ff 100%);
-            transform: scale(1.1);
+            transform: scale(1.15);
+            border: 3px solid #fff;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.6);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 0 20px rgba(0, 212, 255, 0.6);
+            }
+            50% {
+                box-shadow: 0 0 35px rgba(0, 212, 255, 0.9);
+            }
         }
 
         .leg.completed {
+            background-color: #444;
+            color: #888;
+            opacity: 0.6;
+        }
+
+        .leg.upcoming {
             background-color: #27ae60;
+            color: white;
         }
 
         .arrow {
@@ -136,14 +156,28 @@
             border-radius: 20px;
             cursor: pointer;
             transition: all 0.3s ease;
-            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
             color: white;
-            box-shadow: 0 10px 30px rgba(243, 156, 18, 0.3);
+            margin-bottom: 15px;
         }
 
-        .claim-button:hover {
+        .transfer-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .transfer-button:hover {
             transform: translateY(-3px);
-            box-shadow: 0 15px 40px rgba(243, 156, 18, 0.4);
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.5);
+        }
+
+        .handover-button {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            box-shadow: 0 10px 30px rgba(56, 239, 125, 0.4);
+        }
+
+        .handover-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(56, 239, 125, 0.5);
         }
 
         .claim-button:active {
@@ -163,9 +197,11 @@
 
         .waiting-message {
             text-align: center;
-            color: #666;
-            font-size: 1.2rem;
+            color: #888;
+            font-size: 1.5rem;
             padding: 40px;
+            background-color: #16213e;
+            border-radius: 15px;
         }
 
         .baggage-state {
@@ -185,6 +221,49 @@
         .baggage-claimed {
             background-color: #27ae60;
             color: white;
+        }
+
+        .sync-ledger {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: #0a0a15;
+            border-top: 1px solid #1a1a2e;
+            padding: 10px 20px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            color: #00ff88;
+            max-height: 80px;
+            overflow: hidden;
+        }
+
+        .sync-ledger-title {
+            color: #666;
+            margin-bottom: 5px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .sync-ledger-content {
+            line-height: 1.4;
+        }
+
+        @keyframes flashUpdate {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .flash-update {
+            animation: flashUpdate 0.3s ease-in-out;
         }
     </style>
 </head>
@@ -213,11 +292,19 @@
 
     <div class="action-section">
         <div class="waiting-message" id="waiting-message">
-            Waiting for VIP to reach baggage area...
+            Awaiting Baggage Actions...
         </div>
-        <button class="claim-button hidden" id="claim-button" onclick="markBaggageClaimed()">
-            Mark Baggage<br>Claimed / Transferred
+        <button class="claim-button transfer-button hidden" id="transfer-button" onclick="transferBaggage()">
+            Transfer Bags<br>To Next Flight
         </button>
+        <button class="claim-button handover-button hidden" id="handover-button" onclick="handoverBaggage()">
+            Handover Bags<br>To VIP
+        </button>
+    </div>
+
+    <div class="sync-ledger">
+        <div class="sync-ledger-title">Live Sync Ledger</div>
+        <div class="sync-ledger-content" id="sync-ledger"></div>
     </div>
 
     <script>
@@ -227,6 +314,17 @@
 
         let ws;
         let reconnectInterval;
+        let lastBaggageState = null;
+        let lastLocation = null;
+        let lastJourneyType = null;
+
+        function triggerFlashUpdate() {
+            const locationEl = document.getElementById('current-location');
+            locationEl.classList.add('flash-update');
+            setTimeout(() => {
+                locationEl.classList.remove('flash-update');
+            }, 300);
+        }
 
         function renderItinerary(itinerary, currentLegIndex) {
             const container = document.getElementById('itinerary-display');
@@ -248,6 +346,8 @@
                     legEl.classList.add('completed');
                 } else if (index === currentLegIndex) {
                     legEl.classList.add('current');
+                } else {
+                    legEl.classList.add('upcoming');
                 }
 
                 container.appendChild(legEl);
@@ -267,38 +367,79 @@
             const baggageStateEl = document.getElementById('baggage-state');
             baggageStateEl.textContent = context.baggage_state || 'CHECKED';
             baggageStateEl.className = 'baggage-state';
-            if (context.baggage_state === 'CLAIMED') {
+            if (context.baggage_state === 'CLAIMED' || context.baggage_state === 'TRANSFERRED_TO_NEXT_LEG') {
                 baggageStateEl.classList.add('baggage-claimed');
             } else {
                 baggageStateEl.classList.add('baggage-checked');
             }
 
-            // Show/hide claim button based on location
-            const claimButton = document.getElementById('claim-button');
+            // Show/hide buttons based on journey_type and current_location
+            const transferButton = document.getElementById('transfer-button');
+            const handoverButton = document.getElementById('handover-button');
             const waitingMessage = document.getElementById('waiting-message');
 
-            if (context.current_location === 'TRANSIT_AREA' || context.current_location === 'BAGGAGE_CLAIM') {
-                claimButton.style.display = 'block';
-                claimButton.classList.remove('hidden');
-                waitingMessage.style.display = 'none';
+            // Hide all by default
+            transferButton.style.display = 'none';
+            handoverButton.style.display = 'none';
+            waitingMessage.style.display = 'none';
 
-                // Disable if already claimed
-                if (context.baggage_state === 'CLAIMED') {
-                    claimButton.disabled = true;
-                    claimButton.textContent = 'BAGGAGE CLAIMED ✓';
+            if (context.journey_type === 'TRANSIT') {
+                // In transit (e.g., Delhi) - show transfer button
+                transferButton.style.display = 'block';
+                if (context.baggage_state === 'TRANSFERRED_TO_NEXT_LEG') {
+                    transferButton.disabled = true;
+                    transferButton.textContent = 'BAGS TRANSFERRED ✓';
                 } else {
-                    claimButton.disabled = false;
-                    claimButton.innerHTML = 'Mark Baggage<br>Claimed / Transferred';
+                    transferButton.disabled = false;
+                    transferButton.innerHTML = 'Transfer Bags<br>To Next Flight';
+                }
+            } else if (context.journey_type === 'ARRIVAL' && context.current_location === 'BAGGAGE_CLAIM') {
+                // Final destination (e.g., London) - show handover button
+                handoverButton.style.display = 'block';
+                if (context.baggage_state === 'CLAIMED') {
+                    handoverButton.disabled = true;
+                    handoverButton.textContent = 'BAGS HANDED OVER ✓';
+                } else {
+                    handoverButton.disabled = false;
+                    handoverButton.innerHTML = 'Handover Bags<br>To VIP';
                 }
             } else {
-                claimButton.style.display = 'none';
-                claimButton.classList.add('hidden');
+                // Neither condition met - show waiting message
                 waitingMessage.style.display = 'block';
             }
         }
 
-        async function markBaggageClaimed() {
-            const button = document.getElementById('claim-button');
+        async function transferBaggage() {
+            const button = document.getElementById('transfer-button');
+            button.disabled = true;
+            button.textContent = 'Processing...';
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ event: 'BAGGAGE_TRANSFERRED' })
+                });
+
+                if (response.ok) {
+                    console.log('BAGGAGE_TRANSFERRED event sent successfully');
+                } else {
+                    console.error('Failed to send event:', response.status);
+                    button.disabled = false;
+                    button.innerHTML = 'Transfer Bags<br>To Next Flight';
+                }
+            } catch (error) {
+                console.error('Error sending event:', error);
+                alert('Failed to send event: ' + error.message);
+                button.disabled = false;
+                button.innerHTML = 'Transfer Bags<br>To Next Flight';
+            }
+        }
+
+        async function handoverBaggage() {
+            const button = document.getElementById('handover-button');
             button.disabled = true;
             button.textContent = 'Processing...';
 
@@ -316,13 +457,13 @@
                 } else {
                     console.error('Failed to send event:', response.status);
                     button.disabled = false;
-                    button.innerHTML = 'Mark Baggage<br>Claimed / Transferred';
+                    button.innerHTML = 'Handover Bags<br>To VIP';
                 }
             } catch (error) {
                 console.error('Error sending event:', error);
                 alert('Failed to send event: ' + error.message);
                 button.disabled = false;
-                button.innerHTML = 'Mark Baggage<br>Claimed / Transferred';
+                button.innerHTML = 'Handover Bags<br>To VIP';
             }
         }
 
@@ -340,7 +481,19 @@
             ws.onmessage = (event) => {
                 try {
                     const context = JSON.parse(event.data);
+                    
+                    // Check if state changed
+                    if (context.baggage_state !== lastBaggageState || 
+                        context.current_location !== lastLocation ||
+                        context.journey_type !== lastJourneyType) {
+                        triggerFlashUpdate();
+                        lastBaggageState = context.baggage_state;
+                        lastLocation = context.current_location;
+                        lastJourneyType = context.journey_type;
+                    }
+                    
                     updateUI(context);
+                    updateSyncLedger(context);
                 } catch (e) {
                     console.error('Failed to parse message:', e);
                 }
@@ -364,6 +517,20 @@
 
         // Initial connection
         connect();
+
+        function updateSyncLedger(context) {
+            const ledger = document.getElementById('sync-ledger');
+            const now = new Date();
+            const timestamp = now.toTimeString().split(' ')[0];
+            const newEntry = `[${timestamp}] System Sync: VIP location updated to ${context.current_location} | State: ${context.overall_state}`;
+            
+            const lines = ledger.innerHTML.split('<br>').filter(line => line.trim());
+            lines.push(newEntry);
+            while (lines.length > 3) {
+                lines.shift();
+            }
+            ledger.innerHTML = lines.join('<br>');
+        }
     </script>
 </body>
 </html>
