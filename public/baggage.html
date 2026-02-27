@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Baggage Handler</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a2e;
+            color: #ffffff;
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            color: #00d4ff;
+            margin-bottom: 10px;
+        }
+
+        .connection-status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .connected {
+            background-color: #27ae60;
+        }
+
+        .disconnected {
+            background-color: #c0392b;
+        }
+
+        .itinerary-section {
+            background-color: #16213e;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+
+        .section-title {
+            font-size: 1rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+        }
+
+        .itinerary-display {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .leg {
+            padding: 15px 20px;
+            border-radius: 10px;
+            font-size: 1.4rem;
+            font-weight: 700;
+            background-color: #0f3460;
+            transition: all 0.3s ease;
+        }
+
+        .leg.current {
+            background: linear-gradient(135deg, #00d4ff 0%, #0099ff 100%);
+            transform: scale(1.1);
+        }
+
+        .leg.completed {
+            background-color: #27ae60;
+        }
+
+        .arrow {
+            font-size: 1.5rem;
+            color: #666;
+        }
+
+        .info-box {
+            background-color: #16213e;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .info-label {
+            font-size: 0.9rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .info-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #00d4ff;
+            margin-top: 5px;
+        }
+
+        .action-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .claim-button {
+            width: 100%;
+            max-width: 400px;
+            padding: 40px 30px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            color: white;
+            box-shadow: 0 10px 30px rgba(243, 156, 18, 0.3);
+        }
+
+        .claim-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(243, 156, 18, 0.4);
+        }
+
+        .claim-button:active {
+            transform: translateY(0);
+        }
+
+        .claim-button:disabled {
+            background: #444;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .waiting-message {
+            text-align: center;
+            color: #666;
+            font-size: 1.2rem;
+            padding: 40px;
+        }
+
+        .baggage-state {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .baggage-checked {
+            background-color: #0f3460;
+            color: #00d4ff;
+        }
+
+        .baggage-claimed {
+            background-color: #27ae60;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Baggage Handler</h1>
+        <span class="connection-status disconnected" id="connection-status">DISCONNECTED</span>
+    </div>
+
+    <div class="itinerary-section">
+        <div class="section-title">Flight Itinerary</div>
+        <div class="itinerary-display" id="itinerary-display">
+            <span class="leg">---</span>
+        </div>
+    </div>
+
+    <div class="info-box">
+        <div class="info-label">Current Location</div>
+        <div class="info-value" id="current-location">---</div>
+    </div>
+
+    <div class="info-box">
+        <div class="info-label">Baggage Status</div>
+        <div class="baggage-state baggage-checked" id="baggage-state">CHECKED</div>
+    </div>
+
+    <div class="action-section">
+        <div class="waiting-message" id="waiting-message">
+            Waiting for VIP to reach baggage area...
+        </div>
+        <button class="claim-button hidden" id="claim-button" onclick="markBaggageClaimed()">
+            Mark Baggage<br>Claimed / Transferred
+        </button>
+    </div>
+
+    <script>
+        const SERVER_IP = window.location.hostname || '127.0.0.1';
+        const WS_URL = `ws://${SERVER_IP}:8000/ws`;
+        const API_URL = `http://${SERVER_IP}:8000/event`;
+
+        let ws;
+        let reconnectInterval;
+
+        function renderItinerary(itinerary, currentLegIndex) {
+            const container = document.getElementById('itinerary-display');
+            container.innerHTML = '';
+
+            itinerary.forEach((leg, index) => {
+                if (index > 0) {
+                    const arrow = document.createElement('span');
+                    arrow.className = 'arrow';
+                    arrow.textContent = '→';
+                    container.appendChild(arrow);
+                }
+
+                const legEl = document.createElement('span');
+                legEl.className = 'leg';
+                legEl.textContent = leg;
+
+                if (index < currentLegIndex) {
+                    legEl.classList.add('completed');
+                } else if (index === currentLegIndex) {
+                    legEl.classList.add('current');
+                }
+
+                container.appendChild(legEl);
+            });
+        }
+
+        function updateUI(context) {
+            // Update location
+            document.getElementById('current-location').textContent = context.current_location || '---';
+
+            // Render itinerary
+            if (context.itinerary) {
+                renderItinerary(context.itinerary, context.current_leg_index || 0);
+            }
+
+            // Update baggage state
+            const baggageStateEl = document.getElementById('baggage-state');
+            baggageStateEl.textContent = context.baggage_state || 'CHECKED';
+            baggageStateEl.className = 'baggage-state';
+            if (context.baggage_state === 'CLAIMED') {
+                baggageStateEl.classList.add('baggage-claimed');
+            } else {
+                baggageStateEl.classList.add('baggage-checked');
+            }
+
+            // Show/hide claim button based on location
+            const claimButton = document.getElementById('claim-button');
+            const waitingMessage = document.getElementById('waiting-message');
+
+            if (context.current_location === 'TRANSIT_AREA' || context.current_location === 'OUTSIDE') {
+                claimButton.classList.remove('hidden');
+                waitingMessage.classList.add('hidden');
+
+                // Disable if already claimed
+                if (context.baggage_state === 'CLAIMED') {
+                    claimButton.disabled = true;
+                    claimButton.textContent = 'BAGGAGE CLAIMED ✓';
+                } else {
+                    claimButton.disabled = false;
+                    claimButton.innerHTML = 'Mark Baggage<br>Claimed / Transferred';
+                }
+            } else {
+                claimButton.classList.add('hidden');
+                waitingMessage.classList.remove('hidden');
+            }
+        }
+
+        async function markBaggageClaimed() {
+            const button = document.getElementById('claim-button');
+            button.disabled = true;
+            button.textContent = 'Processing...';
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ event: 'BAGGAGE_CLAIMED' })
+                });
+
+                if (response.ok) {
+                    console.log('BAGGAGE_CLAIMED event sent successfully');
+                } else {
+                    console.error('Failed to send event:', response.status);
+                    button.disabled = false;
+                    button.innerHTML = 'Mark Baggage<br>Claimed / Transferred';
+                }
+            } catch (error) {
+                console.error('Error sending event:', error);
+                alert('Failed to send event: ' + error.message);
+                button.disabled = false;
+                button.innerHTML = 'Mark Baggage<br>Claimed / Transferred';
+            }
+        }
+
+        function connect() {
+            ws = new WebSocket(WS_URL);
+
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                const status = document.getElementById('connection-status');
+                status.textContent = 'CONNECTED';
+                status.className = 'connection-status connected';
+                clearInterval(reconnectInterval);
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const context = JSON.parse(event.data);
+                    updateUI(context);
+                } catch (e) {
+                    console.error('Failed to parse message:', e);
+                }
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                const status = document.getElementById('connection-status');
+                status.textContent = 'DISCONNECTED';
+                status.className = 'connection-status disconnected';
+                reconnectInterval = setInterval(() => {
+                    console.log('Attempting to reconnect...');
+                    connect();
+                }, 3000);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        // Initial connection
+        connect();
+    </script>
+</body>
+</html>

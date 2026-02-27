@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIP Journey Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a2e;
+            color: #eaeaea;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #00d4ff;
+            margin-bottom: 10px;
+            font-size: 2rem;
+        }
+
+        .status {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+
+        .status.connected {
+            color: #00ff88;
+        }
+
+        .status.disconnected {
+            color: #ff4444;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .json-container {
+            background-color: #16213e;
+            border: 1px solid #0f3460;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            overflow-x: auto;
+        }
+
+        .json-container h2 {
+            color: #00d4ff;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        pre {
+            background-color: #0f0f23;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #00ff88;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .event-btn {
+            padding: 20px 25px;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .event-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        .event-btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-enter {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-delayed {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .btn-cancelled {
+            background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
+            color: white;
+        }
+
+        .btn-boarding {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+
+        .btn-landed {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .btn-late {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            color: #333;
+        }
+
+        .btn-exited {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            color: #333;
+        }
+
+        .btn-noshow {
+            background: linear-gradient(135deg, #434343 0%, #000000 100%);
+            color: white;
+            border: 1px solid #666;
+        }
+
+        .section-title {
+            color: #00d4ff;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>VIP Journey Orchestrator</h1>
+        <div class="status disconnected" id="status">Disconnected</div>
+
+        <div class="json-container">
+            <h2>VIP Context State</h2>
+            <pre id="json-display">Waiting for connection...</pre>
+        </div>
+
+        <h2 class="section-title">Event Controls</h2>
+        <div class="button-grid">
+            <button class="event-btn btn-enter" onclick="sendEvent('VIP_ENTERED_TERMINAL')">VIP Enters Terminal</button>
+            <button class="event-btn btn-delayed" onclick="sendEvent('FLIGHT_DELAYED')">Flight Delayed</button>
+            <button class="event-btn btn-cancelled" onclick="sendEvent('FLIGHT_CANCELLED')">Flight Cancelled</button>
+            <button class="event-btn btn-boarding" onclick="sendEvent('BOARDING_STARTED')">Boarding Started</button>
+            <button class="event-btn btn-landed" onclick="sendEvent('FLIGHT_LANDED')">Flight Landed</button>
+            <button class="event-btn btn-late" onclick="sendEvent('VIP_LATE_TO_LOUNGE')">VIP Late to Lounge</button>
+            <button class="event-btn btn-exited" onclick="sendEvent('VIP_EXITED_TERMINAL')">VIP Exited Terminal</button>
+            <button class="event-btn btn-noshow" onclick="sendEvent('VIP_NO_SHOW')">VIP No Show</button>
+        </div>
+    </div>
+
+    <script>
+        const SERVER_IP = window.location.hostname || '127.0.0.1';
+        const WS_URL = `ws://${SERVER_IP}:8000/ws`;
+        const API_URL = `http://${SERVER_IP}:8000/event`;
+
+        let ws;
+        let reconnectInterval;
+
+        function connect() {
+            ws = new WebSocket(WS_URL);
+
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                document.getElementById('status').textContent = 'Connected';
+                document.getElementById('status').className = 'status connected';
+                clearInterval(reconnectInterval);
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    document.getElementById('json-display').textContent = JSON.stringify(data, null, 2);
+                } catch (e) {
+                    document.getElementById('json-display').textContent = event.data;
+                }
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                document.getElementById('status').textContent = 'Disconnected - Reconnecting...';
+                document.getElementById('status').className = 'status disconnected';
+                reconnectInterval = setInterval(() => {
+                    console.log('Attempting to reconnect...');
+                    connect();
+                }, 3000);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        async function sendEvent(eventName) {
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ event: eventName })
+                });
+
+                if (response.ok) {
+                    console.log(`Event ${eventName} sent successfully`);
+                } else {
+                    console.error(`Failed to send event: ${response.status}`);
+                }
+            } catch (error) {
+                console.error('Error sending event:', error);
+                alert(`Failed to send event: ${error.message}`);
+            }
+        }
+
+        // Initial connection
+        connect();
+    </script>
+</body>
+</html>

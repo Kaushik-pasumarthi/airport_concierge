@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chauffeur / Transport</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            transition: background-color 0.5s ease;
+        }
+
+        /* State backgrounds */
+        .state-pending {
+            background-color: #4a4a4a;
+            color: #ffffff;
+        }
+
+        .state-assigned {
+            background-color: #2ecc71;
+            color: #ffffff;
+        }
+
+        .state-cancelled {
+            background-color: #e74c3c;
+            color: #ffffff;
+        }
+
+        .container {
+            text-align: center;
+            max-width: 900px;
+            width: 100%;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        .status-message {
+            font-size: 4rem;
+            font-weight: 700;
+            margin-bottom: 50px;
+            line-height: 1.2;
+            text-transform: uppercase;
+        }
+
+        .info-box {
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 20px;
+            padding: 40px;
+            margin-top: 40px;
+            display: inline-block;
+            min-width: 300px;
+        }
+
+        .info-label {
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            opacity: 0.8;
+            margin-bottom: 10px;
+        }
+
+        .info-value {
+            font-size: 3rem;
+            font-weight: 700;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .connected {
+            background-color: #27ae60;
+            color: white;
+        }
+
+        .disconnected {
+            background-color: #c0392b;
+            color: white;
+        }
+
+        .icon {
+            font-size: 6rem;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body class="state-pending">
+    <div class="connection-status disconnected" id="connection-status">DISCONNECTED</div>
+    
+    <div class="container">
+        <h1>Chauffeur / Transport</h1>
+        
+        <div class="icon" id="icon">🚗</div>
+        
+        <div class="status-message" id="status-message">DO NOT DISPATCH</div>
+        
+        <div class="info-box">
+            <div class="info-label">Transport State</div>
+            <div class="info-value" id="transport-state">---</div>
+        </div>
+    </div>
+
+    <script>
+        const SERVER_IP = window.location.hostname || '127.0.0.1';
+        const WS_URL = `ws://${SERVER_IP}:8000/ws`;
+
+        let ws;
+        let reconnectInterval;
+
+        function updateUI(context) {
+            // Update transport state display
+            document.getElementById('transport-state').textContent = context.transport_state || '---';
+
+            const body = document.body;
+            const statusMessage = document.getElementById('status-message');
+            const icon = document.getElementById('icon');
+
+            // Remove all state classes
+            body.classList.remove('state-pending', 'state-assigned', 'state-cancelled');
+
+            // Apply UI logic based on transport_state
+            if (context.transport_state === 'CANCELLED') {
+                body.classList.add('state-cancelled');
+                statusMessage.textContent = 'VIP NO SHOW - STAND DOWN';
+                icon.textContent = '🚫';
+            } else if (context.transport_state === 'DRIVER_ASSIGNED') {
+                body.classList.add('state-assigned');
+                statusMessage.textContent = 'DISPATCH DRIVER TO TERMINAL EXIT';
+                icon.textContent = '✅';
+            } else if (context.transport_state === 'PENDING' || context.transport_state === 'HOLD') {
+                body.classList.add('state-pending');
+                statusMessage.textContent = 'DO NOT DISPATCH';
+                icon.textContent = '🚗';
+            } else {
+                body.classList.add('state-pending');
+                statusMessage.textContent = context.transport_state || 'DO NOT DISPATCH';
+                icon.textContent = '🚗';
+            }
+        }
+
+        function connect() {
+            ws = new WebSocket(WS_URL);
+
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                const status = document.getElementById('connection-status');
+                status.textContent = 'CONNECTED';
+                status.className = 'connection-status connected';
+                clearInterval(reconnectInterval);
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const context = JSON.parse(event.data);
+                    updateUI(context);
+                } catch (e) {
+                    console.error('Failed to parse message:', e);
+                }
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                const status = document.getElementById('connection-status');
+                status.textContent = 'DISCONNECTED';
+                status.className = 'connection-status disconnected';
+                reconnectInterval = setInterval(() => {
+                    console.log('Attempting to reconnect...');
+                    connect();
+                }, 3000);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        // Initial connection
+        connect();
+    </script>
+</body>
+</html>

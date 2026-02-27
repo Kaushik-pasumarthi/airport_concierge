@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lounge Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            transition: background-color 0.5s ease;
+        }
+
+        /* State backgrounds */
+        .state-pending {
+            background-color: #4a4a4a;
+            color: #ffffff;
+        }
+
+        .state-active {
+            background-color: #2ecc71;
+            color: #ffffff;
+        }
+
+        .state-rebooking {
+            background-color: #e74c3c;
+            color: #ffffff;
+            animation: flash 1s infinite;
+        }
+
+        .state-denied {
+            background-color: #f39c12;
+            color: #ffffff;
+        }
+
+        @keyframes flash {
+            0%, 50%, 100% {
+                opacity: 1;
+            }
+            25%, 75% {
+                opacity: 0.5;
+            }
+        }
+
+        .container {
+            text-align: center;
+            max-width: 900px;
+            width: 100%;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        .status-message {
+            font-size: 4rem;
+            font-weight: 700;
+            margin-bottom: 50px;
+            line-height: 1.2;
+            text-transform: uppercase;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+            margin-top: 40px;
+        }
+
+        .info-box {
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 20px;
+            padding: 30px;
+        }
+
+        .info-label {
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            opacity: 0.8;
+            margin-bottom: 10px;
+        }
+
+        .info-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .connected {
+            background-color: #27ae60;
+            color: white;
+        }
+
+        .disconnected {
+            background-color: #c0392b;
+            color: white;
+        }
+    </style>
+</head>
+<body class="state-pending">
+    <div class="connection-status disconnected" id="connection-status">DISCONNECTED</div>
+    
+    <div class="container">
+        <h1>Lounge Manager</h1>
+        
+        <div class="status-message" id="status-message">AWAITING VIP</div>
+        
+        <div class="info-grid">
+            <div class="info-box">
+                <div class="info-label">Current Location</div>
+                <div class="info-value" id="current-location">---</div>
+            </div>
+            <div class="info-box">
+                <div class="info-label">Lounge State</div>
+                <div class="info-value" id="lounge-state">---</div>
+            </div>
+            <div class="info-box">
+                <div class="info-label">Overall State</div>
+                <div class="info-value" id="overall-state">---</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SERVER_IP = window.location.hostname || '127.0.0.1';
+        const WS_URL = `ws://${SERVER_IP}:8000/ws`;
+
+        let ws;
+        let reconnectInterval;
+
+        function updateUI(context) {
+            // Update info displays
+            document.getElementById('current-location').textContent = context.current_location || '---';
+            document.getElementById('lounge-state').textContent = context.lounge_state || '---';
+            document.getElementById('overall-state').textContent = context.overall_state || '---';
+
+            const body = document.body;
+            const statusMessage = document.getElementById('status-message');
+
+            // Remove all state classes
+            body.classList.remove('state-pending', 'state-active', 'state-rebooking', 'state-denied');
+
+            // Apply UI logic based on state
+            if (context.overall_state === 'REBOOKING_PENDING') {
+                body.classList.add('state-rebooking');
+                statusMessage.textContent = 'FLIGHT CANCELLED - ASSIST VIP WITH REBOOKING. LOUNGE EXTENDED';
+            } else if (context.lounge_state === 'DENIED_TIME_PRIORITY') {
+                body.classList.add('state-denied');
+                statusMessage.textContent = 'LATE ARRIVAL - SEND VIP DIRECTLY TO GATE';
+            } else if (context.lounge_state === 'ACTIVE') {
+                body.classList.add('state-active');
+                statusMessage.textContent = 'VIP GRANTED ACCESS';
+            } else if (context.lounge_state === 'PENDING' || context.lounge_state === 'RESERVED') {
+                body.classList.add('state-pending');
+                statusMessage.textContent = 'AWAITING VIP';
+            } else {
+                body.classList.add('state-pending');
+                statusMessage.textContent = context.lounge_state || 'AWAITING VIP';
+            }
+        }
+
+        function connect() {
+            ws = new WebSocket(WS_URL);
+
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                const status = document.getElementById('connection-status');
+                status.textContent = 'CONNECTED';
+                status.className = 'connection-status connected';
+                clearInterval(reconnectInterval);
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const context = JSON.parse(event.data);
+                    updateUI(context);
+                } catch (e) {
+                    console.error('Failed to parse message:', e);
+                }
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                const status = document.getElementById('connection-status');
+                status.textContent = 'DISCONNECTED';
+                status.className = 'connection-status disconnected';
+                reconnectInterval = setInterval(() => {
+                    console.log('Attempting to reconnect...');
+                    connect();
+                }, 3000);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        // Initial connection
+        connect();
+    </script>
+</body>
+</html>
