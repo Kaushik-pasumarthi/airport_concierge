@@ -54,7 +54,18 @@ def reconcile(context: dict, event: str):
     """State machine reconciliation function."""
     global boarding_time
 
-    if event == "VIP_ENTERED_TERMINAL":
+    if event == "RESET":
+        context["current_leg_index"] = 0
+        context["journey_type"] = "DEPARTURE"
+        context["current_location"] = "OUTSIDE"
+        context["flight_state"] = "SCHEDULED"
+        context["baggage_state"] = "CHECKED"
+        context["transport_state"] = "PENDING"
+        context["lounge_state"] = "PENDING"
+        context["overall_state"] = "ACTIVE"
+        context["gate_state"] = "WAITING"
+
+    elif event == "VIP_ENTERED_TERMINAL":
         context["current_location"] = "CHECKIN"
         context["transport_state"] = "COMPLETED"
         context["lounge_state"] = "RESERVED"
@@ -78,12 +89,18 @@ def reconcile(context: dict, event: str):
         context["lounge_state"] = "COMPLETED"
         context["current_location"] = "GATE"
         context["gate_state"] = "BOARDING"
+        context["overall_state"] = "ACTIVE"  # Clear any previous rebooking/escalated states
 
     elif event == "FLIGHT_LANDED":
-        context["current_leg_index"] += 1
-        if context["current_leg_index"] == 1:
-            context["journey_type"] = "TRANSIT"
-            context["current_location"] = "TRANSIT_AREA"
+        # Only increment if not at the last leg
+        if context["current_leg_index"] < len(context["itinerary"]) - 1:
+            context["current_leg_index"] += 1
+            if context["current_leg_index"] == 1:
+                context["journey_type"] = "TRANSIT"
+                context["current_location"] = "TRANSIT_AREA"
+            elif context["current_leg_index"] == 2:
+                context["journey_type"] = "ARRIVAL"
+                context["current_location"] = "BAGGAGE_CLAIM"
 
     elif event == "VIP_LATE_TO_LOUNGE":
         context["lounge_state"] = "DENIED_TIME_PRIORITY"

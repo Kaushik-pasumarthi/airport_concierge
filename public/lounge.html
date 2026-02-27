@@ -44,6 +44,11 @@
             color: #ffffff;
         }
 
+        .state-completed {
+            background-color: #2c3e50;
+            color: #ffffff;
+        }
+
         @keyframes flash {
             0%, 50%, 100% {
                 opacity: 1;
@@ -162,24 +167,24 @@
             const statusMessage = document.getElementById('status-message');
 
             // Remove all state classes
-            body.classList.remove('state-pending', 'state-active', 'state-rebooking', 'state-denied');
+            body.classList.remove('state-pending', 'state-active', 'state-rebooking', 'state-denied', 'state-completed');
 
-            // Apply UI logic based on state
-            if (context.overall_state === 'REBOOKING_PENDING') {
-                body.classList.add('state-rebooking');
-                statusMessage.textContent = 'FLIGHT CANCELLED - ASSIST VIP WITH REBOOKING. LOUNGE EXTENDED';
-            } else if (context.lounge_state === 'DENIED_TIME_PRIORITY') {
+            // Apply UI logic based on state - strict if/else hierarchy
+            if (context.lounge_state === 'DENIED_TIME_PRIORITY') {
                 body.classList.add('state-denied');
-                statusMessage.textContent = 'LATE ARRIVAL - SEND VIP DIRECTLY TO GATE';
+                statusMessage.textContent = 'LATE ARRIVAL - DIRECT TO GATE';
+            } else if (context.overall_state === 'REBOOKING_PENDING') {
+                body.classList.add('state-rebooking');
+                statusMessage.textContent = 'FLIGHT CANCELLED - ASSIST REBOOKING';
+            } else if (context.lounge_state === 'COMPLETED') {
+                body.classList.add('state-completed');
+                statusMessage.textContent = 'VIP DEPARTED TO GATE';
             } else if (context.lounge_state === 'ACTIVE') {
                 body.classList.add('state-active');
                 statusMessage.textContent = 'VIP GRANTED ACCESS';
-            } else if (context.lounge_state === 'PENDING' || context.lounge_state === 'RESERVED') {
-                body.classList.add('state-pending');
-                statusMessage.textContent = 'AWAITING VIP';
             } else {
                 body.classList.add('state-pending');
-                statusMessage.textContent = context.lounge_state || 'AWAITING VIP';
+                statusMessage.textContent = 'AWAITING VIP';
             }
         }
 

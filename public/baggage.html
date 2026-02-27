@@ -277,9 +277,10 @@
             const claimButton = document.getElementById('claim-button');
             const waitingMessage = document.getElementById('waiting-message');
 
-            if (context.current_location === 'TRANSIT_AREA' || context.current_location === 'OUTSIDE') {
+            if (context.current_location === 'TRANSIT_AREA' || context.current_location === 'BAGGAGE_CLAIM') {
+                claimButton.style.display = 'block';
                 claimButton.classList.remove('hidden');
-                waitingMessage.classList.add('hidden');
+                waitingMessage.style.display = 'none';
 
                 // Disable if already claimed
                 if (context.baggage_state === 'CLAIMED') {
@@ -290,8 +291,9 @@
                     claimButton.innerHTML = 'Mark Baggage<br>Claimed / Transferred';
                 }
             } else {
+                claimButton.style.display = 'none';
                 claimButton.classList.add('hidden');
-                waitingMessage.classList.remove('hidden');
+                waitingMessage.style.display = 'block';
             }
         }
 

@@ -141,6 +141,15 @@
             border: 1px solid #666;
         }
 
+        .btn-reset {
+            background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%);
+            color: #333;
+            grid-column: span 2;
+            font-size: 1.2rem;
+            border: 3px solid #ff6b00;
+            box-shadow: 0 0 20px rgba(255, 210, 0, 0.5);
+        }
+
         .section-title {
             color: #00d4ff;
             margin-bottom: 20px;
@@ -160,6 +169,7 @@
 
         <h2 class="section-title">Event Controls</h2>
         <div class="button-grid">
+            <button class="event-btn btn-reset" onclick="sendEvent('RESET')">🔄 RESET DEMO</button>
             <button class="event-btn btn-enter" onclick="sendEvent('VIP_ENTERED_TERMINAL')">VIP Enters Terminal</button>
             <button class="event-btn btn-delayed" onclick="sendEvent('FLIGHT_DELAYED')">Flight Delayed</button>
             <button class="event-btn btn-cancelled" onclick="sendEvent('FLIGHT_CANCELLED')">Flight Cancelled</button>
